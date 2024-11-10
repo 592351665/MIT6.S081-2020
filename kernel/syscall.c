@@ -145,7 +145,7 @@ syscall(void)
 
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    printf("%s被调用了!\n",syscall_names[nums-1]);
+    printf("%s被调用了!\n",syscall_names[num-1]);
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",
