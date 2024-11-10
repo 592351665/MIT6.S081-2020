@@ -101,6 +101,6 @@ uint64
 sys_trace(void)
 {
 
-  print("sys_trace:Hi!\n");
+  printf("sys_trace:Hi!\n");
   return 0;
 }
