@@ -95,3 +95,12 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//Add a sys_trace() function in kernel/sysproc.c
+uint64
+sys_trace(void)
+{
+
+  print("sys_trace:Hi!\n");
+  return 0;
+}
