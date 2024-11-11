@@ -127,6 +127,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // (newly added) 为 syscall_trace 设置一个 0 的默认值
+  p->trace_mask = 0;
+
   return p;
 }
 
@@ -150,7 +153,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  p->trace_mask = 0;
+
 }
 
 // Create a user page table for a given process,
