@@ -127,7 +127,7 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  // (newly added) 为 syscall_trace 设置一个 0 的默认值
+  // (newly added) 为 trace_mask 设置一个 0 的默认值
   p->trace_mask = 0;
 
   return p;
