@@ -8,6 +8,9 @@
 #include "proc.h"
 #include "sysinfo.h"
 
+uint64 acquire_freemem();
+uint64 acquire_nproc();
+
 uint64
 sys_exit(void)
 {
@@ -117,8 +120,8 @@ sys_sysinfo(void){
   uint64 addr;
   struct proc *p = myproc();
 
-  info.freemem = -2;
-  info.nproc = -1;
+  info.freemem = acquire_freemem();
+  info.nproc = acquire_nproc;
 
   if(argaddr(0, &addr) < 0)
     return -1;
