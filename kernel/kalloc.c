@@ -81,7 +81,8 @@ kalloc(void)
   return (void*)r;
 }
 
-uint64 acquire_freemem(){
+uint64 
+acquire_freemem(){
   struct run *r;
   uint64 cnt = 0;
 

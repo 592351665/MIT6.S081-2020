@@ -701,7 +701,8 @@ procdump(void)
   }
 }
 
-uint64 acquire_nproc(){
+uint64 
+acquire_nproc(){
   struct proc *p;
   int cnt = 0;
 
