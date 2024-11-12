@@ -121,7 +121,7 @@ sys_sysinfo(void){
   struct proc *p = myproc();
 
   info.freemem = acquire_freemem();
-  info.nproc = acquire_nproc;
+  info.nproc = acquire_nproc();
 
   if(argaddr(0, &addr) < 0)
     return -1;
