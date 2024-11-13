@@ -54,7 +54,7 @@ kfree(void *pa)
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
-  r = (struct run*)pa;
+  r = (struct run*)pa; //空页面
 
   acquire(&kmem.lock);
   r->next = kmem.freelist;
