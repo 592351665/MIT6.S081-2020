@@ -121,6 +121,13 @@ found:
     return 0;
   }
 
+  p->kernelpagetable = proc_kpt_init();
+  if(p->kernelpagetable == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
