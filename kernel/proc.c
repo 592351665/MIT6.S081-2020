@@ -34,12 +34,10 @@ procinit(void)
       // Allocate a page for the process's kernel stack.
       // Map it high in memory, followed by an invalid
       // guard page.
-      char *pa = kalloc();
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
+
+
+
+
   }
   kvminithart();
 }
@@ -121,13 +119,22 @@ found:
     return 0;
   }
 
-  //进程的内核页表
+  //初始化进程的内核页表（共同部分）
   p->kernelpagetable = proc_kpt_init();
   if(p->kernelpagetable == 0){
     freeproc(p);
     release(&p->lock);
     return 0;
   }
+
+  //初始化每个进程的内核栈（各自部分）
+  char *pa = kalloc();//内核栈的物理地址
+  if(pa == 0)
+    panic("kalloc");
+  uint64 va = KSTACK((int) (p - proc));//计算出进程p内核栈的虚拟地址va
+  uvmmap(p->kernelpagetable,va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;
+
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
