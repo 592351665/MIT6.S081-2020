@@ -464,7 +464,7 @@ void printwalk(pagetable_t pagetable,uint64 depth){
       }
       printf("%d:pte %p pa %p\n",i,pte,child);
 
-      if(pte & (PTE_R|PTE_W|PTE_X)==0){
+      if((pte & (PTE_R|PTE_W|PTE_X))==0){
         printwalk((pagetable_t)child,depth+1);
       }
     }
