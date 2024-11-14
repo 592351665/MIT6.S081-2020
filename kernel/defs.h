@@ -13,6 +13,10 @@ struct mbuf;
 struct sock;
 #endif
 
+//print a page table
+void            vmprint(pagetable_t);
+void            printwalk(pagetable_t,uint64);
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
