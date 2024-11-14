@@ -121,6 +121,7 @@ found:
     return 0;
   }
 
+  //进程的内核页表
   p->kernelpagetable = proc_kpt_init();
   if(p->kernelpagetable == 0){
     freeproc(p);

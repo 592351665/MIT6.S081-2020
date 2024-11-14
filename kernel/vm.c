@@ -475,7 +475,7 @@ void
 uvmmap(pagetable_t pagetable,uint64 va, uint64 pa, uint64 sz, int perm)
 {
   if(mappages(pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+    panic("uvmmap");
 }
 
 pagetable_t
