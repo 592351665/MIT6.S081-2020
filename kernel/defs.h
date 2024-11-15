@@ -13,7 +13,8 @@ struct mbuf;
 struct sock;
 #endif
 
-//A kernel page table per process 
+//A kernel page table per process  
+void            proc_freekernelpt(pagetable_t);
 void            uvmmap(pagetable_t,uint64, uint64, uint64, int);
 pagetable_t     proc_kpt_init(void);
 

@@ -157,6 +157,17 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+
+  if(p->kstack){
+    uvmunmap(p->kernelpagetable, p->kstack, 1, 1);
+  }
+  p->kstack = 0;
+
+  if(p->kernelpagetable){
+    proc_freekernelpt(p->kernelpagetable);
+  }
+  p->kernelpagetable = 0;
+
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -496,7 +507,7 @@ scheduler(void)
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        kvminithart();//进程p结束后，再把全局内核页表加载回去
+        kvminithart();//再把全局内核页表加载回去
 
         c->proc = 0;
 
@@ -718,3 +729,19 @@ procdump(void)
     printf("\n");
   }
 }
+
+void
+proc_freekernelpt(pagetable_t kernelpagetable){
+  for(int i = 0; i < 512; i++){
+    pte_t pte = kernelpagetable[i];
+    if(pte & PTE_V){
+      kernelpagetable[i] = 0;
+      if((pte&(PTE_R|PTE_W|PTE_X))==0){
+        uint64 child = PTE2PA(pte);
+        proc_freekernelpt((pagetable_t)child);
+      }
+    } 
+  }
+  kfree((void*)kernelpagetable);
+}
+
