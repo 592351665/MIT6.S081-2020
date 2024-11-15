@@ -488,10 +488,16 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
-        swtch(&c->context, &p->context);
+
+        w_satp(MAKE_SATP(p->kernelpagetable));
+        sfence_vma();//刷新TLB快表
+
+        swtch(&c->context, &p->context);//切换 CPU 上下文至进程 p 的上下文，使该进程开始执行,再执行前satp寄存器要载入好
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
+        kvminithart();//进程p结束后，再把全局内核页表加载回去
+
         c->proc = 0;
 
         found = 1;
