@@ -485,7 +485,7 @@ uvmmap(pagetable_t pagetable,uint64 va, uint64 pa, uint64 sz, int perm)
 pagetable_t
 proc_kpt_init()
 {
-  pagetable_t kpt = uvmcreate();//功能相同
+  pagetable_t kpt = uvmcreate();//与user pt创建空页表相同
 
   // uart registers
   uvmmap(kpt,UART0, UART0, PGSIZE, PTE_R | PTE_W);
