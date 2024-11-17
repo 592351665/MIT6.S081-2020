@@ -309,7 +309,7 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
-void
+int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
@@ -482,6 +482,5 @@ u2kvmcopy(pagetable_t pagetable, pagetable_t kernelpagetable, uint64 oldsz,uint6
     pa = PTE2PA(*pte_from);
     flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
     *pte_to = PA2PTE(pa) | flags;
-
   }
 }
