@@ -309,7 +309,7 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
-int
+void
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
@@ -461,4 +461,27 @@ proc_kpt_init()
   uvmmap(kpt,TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
   return kpt;
+}
+
+
+void
+u2kvmcopy(pagetable_t pagetable, pagetable_t kernelpagetable, uint64 oldsz,uint64 newsz)
+{
+  pte_t *pte_from,*pte_to;
+  uint64 pa, i;
+  uint flags;
+
+  oldsz = PGROUNDUP(oldsz);
+  for(i =oldsz; i < newsz; i += PGSIZE){
+    if((pte_from = walk(pagetable, i, 0)) == 0)
+      panic("u2kvmcopy: src pte does not exist");
+
+    if((pte_to = walk(kernelpagetable,i,1))==0){
+      panic("u2kvmcopy: pte walk failed");
+    }
+    pa = PTE2PA(*pte_from);
+    flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
+    *pte_to = PTE2PAE(pa) | flags;
+
+  }
 }
