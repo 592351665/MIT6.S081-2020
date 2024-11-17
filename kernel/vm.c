@@ -481,7 +481,7 @@ u2kvmcopy(pagetable_t pagetable, pagetable_t kernelpagetable, uint64 oldsz,uint6
     }
     pa = PTE2PA(*pte_from);
     flags = (PTE_FLAGS(*pte_from))&(~PTE_U);
-    *pte_to = PTE2PAE(pa) | flags;
+    *pte_to = PA2PTE(pa) | flags;
 
   }
 }
