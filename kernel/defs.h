@@ -13,6 +13,10 @@ struct mbuf;
 struct sock;
 #endif
 
+//Simplify
+int             copyin_new(pagetable_t, char *, uint64 , uint64);
+int             copyinstr_new(pagetable_t, char *, uint64 , uint64);
+
 //A kernel page table per process  
 void            proc_freekernelpt(pagetable_t);
 void            uvmmap(pagetable_t,uint64, uint64, uint64, int);
