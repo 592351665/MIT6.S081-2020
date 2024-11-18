@@ -25,7 +25,7 @@ pagetable_t     proc_kpt_init(void);
 
 //print a page table
 void            vmprint(pagetable_t);
-void            _vmprint(pagetable_t,int);
+void            _vmprint(pagetable_t,uint64);
 
 // bio.c
 void            binit(void);
