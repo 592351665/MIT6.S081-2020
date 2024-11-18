@@ -75,7 +75,6 @@ exec(char *path, char **argv)
   sp = sz;
   stackbase = sp - PGSIZE;
 
-  u2kvmcopy(pagetable,p->kernelpagetable,0,sz);
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
@@ -117,6 +116,8 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
+
+  u2kvmcopy(p->pagetable,p->kernelpagetable,0,sz);//⬅
 
   if(p->pid==1) vmprint(p->pagetable);
 
