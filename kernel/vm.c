@@ -444,8 +444,8 @@ proc_kpt_init()
   // virtio mmio disk interface
   uvmmap(kpt,VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
 
-  // CLINT
-  uvmmap(kpt,CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  // CLINT 因为位于PLIC之下，防止lab3-3中重映射
+  //uvmmap(kpt,CLINT, CLINT, 0x10000, PTE_R | PTE_W);
 
   // PLIC
   uvmmap(kpt,PLIC, PLIC, 0x400000, PTE_R | PTE_W);
