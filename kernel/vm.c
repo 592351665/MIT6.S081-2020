@@ -398,7 +398,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 void vmprint(pagetable_t pagetable){
   printf("page table %p\n",pagetable);
-  printwalk(pagetable,1);
+  printwalk(pagetable,0);
 }
 
 void printwalk(pagetable_t pagetable,uint64 depth){
@@ -406,16 +406,9 @@ void printwalk(pagetable_t pagetable,uint64 depth){
     pte_t pte=pagetable[i];
     if(pte & PTE_V){
       uint64 child=PTE2PA(pte);
-      switch(depth){
-        case 1:
-          printf("..");
-          break;
-        case 2:
-          printf(".. ..");
-          break;
-        case 3:
-          printf(".. .. ..");
-          break;
+      printf("..");
+      for(int j=0;j<depth;j++){
+        printf(" ..");
       }
       printf("%d:pte %p pa %p\n",i,pte,child);
 
