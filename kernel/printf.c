@@ -139,7 +139,6 @@ backtrace(){
   printf("backtrace:\n");
   uint64 fp = r_fp();
 
-
   uint64 bottom = PGROUNDDOWN(fp);
   uint64 top = PGROUNDUP(fp);
   while(fp<top&&fp>bottom){
