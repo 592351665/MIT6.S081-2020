@@ -47,7 +47,7 @@ usertrap(void)
 
   struct proc *p = myproc();
   
-  // save user program counter.
+  // save user program counter.用户态程序计数器
   p->trapframe->epc = r_sepc();
   
   if(r_scause() == 8){
@@ -79,14 +79,11 @@ usertrap(void)
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
   {
-    if(p->ticks>0){
-      p->ticks_cnt++;
-      if(p->ticks_cnt > p->ticks){
-        p->ticks_cnt = 0;
-        p->trapframe->epc = p->handler;
-      }
+    p->ticks_cnt++;
+    if(p->ticks!=0&&p->ticks_cnt==p->ticks){
+      p->trapframe->epc = p->handler;
+      p->ticks_cnt = 0;
     }
-
     yield();
   }
     
