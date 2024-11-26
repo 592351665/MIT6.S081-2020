@@ -80,9 +80,11 @@ usertrap(void)
   if(which_dev == 2)
   {
     p->ticks_cnt++;
-    if(p->ticks!=0&&p->ticks_cnt==p->ticks){
+    if(p->is_alarming==0&&p->ticks!=0&&p->ticks_cnt==p->ticks){
+      memmove(p->alarm_trapframe,p->trapframe,sizeof(struct trapframe));
       p->trapframe->epc = p->handler;
       p->ticks_cnt = 0;
+      p->is_alarming = 1;
     }
     yield();
   }

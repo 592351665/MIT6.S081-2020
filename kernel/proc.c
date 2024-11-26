@@ -130,6 +130,13 @@ found:
   p->ticks = 0;
   p->ticks_cnt = 0;
   p->handler = 0;
+  p->is_alarming = 0;//未在运行处理函数
+
+  if((p->alarm_trapframe = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+  
 
   return p;
 }
@@ -158,6 +165,12 @@ freeproc(struct proc *p)
   p->ticks = 0;
   p->ticks_cnt = 0;
   p->handler = 0;
+  p->is_alarming = 0;
+  if(p->alarm_trapframe)
+    kfree((void*)p->alarm_trapframe);
+  p->trapframe = 0;
+
+
 }
 
 // Create a user page table for a given process,

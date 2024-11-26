@@ -107,4 +107,6 @@ struct proc {
   int ticks;
   int ticks_cnt;
   uint64 handler;
+  struct trapframe *alarm_trapframe;
+  int is_alarming;
 };
