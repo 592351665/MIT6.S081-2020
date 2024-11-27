@@ -64,12 +64,41 @@ argint(int n, int *ip)
 // Retrieve an argument as a pointer.
 // Doesn't check for legality, since
 // copyin/copyout will do that.
+
+// int
+// argaddr(int n, uint64 *ip)
+// {
+//   *ip = argraw(n);
+//   return 0;
+// }
+
+//kernel/syscall.c
 int
 argaddr(int n, uint64 *ip)
 {
   *ip = argraw(n);
+  struct proc *p = myproc();
+  
+  if(walkaddr(p->pagetable,*ip) == 0){
+    if(*ip < p->sz&&*ip > p->trapframe->sp){
+      char *pa =  kalloc();
+      if(pa == 0){
+        return -1;
+      }
+      memset((void *)pa, 0, PGSIZE);
+      *ip = PGROUNDDOWN(*ip);
+      if(mappages(p->pagetable, *ip, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+        kfree((void *)pa);
+        return -1;
+      }
+    }else{
+      return -1;
+    }
+  }
   return 0;
 }
+
+
 
 // Fetch the nth word-sized system call argument as a null-terminated string.
 // Copies into buf, at most max.
