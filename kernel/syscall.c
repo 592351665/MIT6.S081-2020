@@ -80,15 +80,15 @@ argaddr(int n, uint64 *ip)
   struct proc *p = myproc();
   
   if(walkaddr(p->pagetable,*ip) == 0){
-    if(*ip < p->sz&&*ip > p->trapframe->sp){
+    if(*ip < p->sz&&*ip > PGROUNDUP(p->trapframe->sp)){
       char *pa =  kalloc();
       if(pa == 0){
         return -1;
       }
-      memset((void *)pa, 0, PGSIZE);
+      memset(pa, 0, PGSIZE);
       *ip = PGROUNDDOWN(*ip);
       if(mappages(p->pagetable, *ip, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-        kfree((void *)pa);
+        kfree(pa);
         return -1;
       }
     }else{

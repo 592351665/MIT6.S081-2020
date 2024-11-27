@@ -69,16 +69,13 @@ usertrap(void)
     // ok
   } else if(r_scause() == 13||r_scause() == 15){
     uint64 va = r_stval();
-    if(va < p->sz&&va > p->trapframe->sp){
+    char* pa;
+    if(va < p->sz&&va > PGROUNDUP(p->trapframe->sp)&&(pa = kalloc())!=0){
     // printf("page fault %p\n",va);
-    char *mem =  kalloc();
-    if(mem == 0){
-      p->killed = 1;
-    }
-    memset((void *)mem, 0, PGSIZE);
+    memset(pa, 0, PGSIZE);
     va = PGROUNDDOWN(va);
-    if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-      kfree((void *)mem);
+    if(mappages(p->pagetable, va, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+      kfree(pa);
       p->killed = 1;
     }
 
