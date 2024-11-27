@@ -79,7 +79,9 @@ usertrap(void)
     if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
       kfree((void *)mem);
       p->killed = 1;
+
     }
+
 
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
