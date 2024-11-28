@@ -100,9 +100,15 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if(va >= MAXVA)
     return 0;
 
+  if(is_lazy_addr(va)){
+    lazy_alloc(va);
+  }
+
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
+
+  if(pte == 0){
     return 0;
+  }
   if((*pte & PTE_V) == 0)
     return 0;
   if((*pte & PTE_U) == 0)

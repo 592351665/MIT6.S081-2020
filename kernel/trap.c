@@ -29,6 +29,39 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+int lazy_alloc(uint64 va){
+  struct proc *p=myproc();
+  uint64 page_va = PGROUNDDOWN(va);
+  uint64* pa = kalloc();
+  if(pa == 0){
+    return -1;
+  }
+  memset(pa,0,PGSIZE);
+  if(mappages(p->pagetable,page_va,PGSIZE,(uint64)pa,PTE_W|PTE_R|PTE_X|PTE_U)!=0){
+    kfree(pa);
+    return -1;
+  }
+  return 0;
+}
+
+int is_lazy_addr(uint64 va){
+  struct proc *p = myproc();
+
+  if(va < PGROUNDDOWN(p->trapframe->sp)||va>=p->sz){
+    return 0;
+  }
+  if(va > MAXVA){
+    return 0;
+  }
+  pte_t* pte = walk(p->pagetable, va, 0);
+  
+  if(pte && (*pte & PTE_V)){
+    return 0;
+  }  
+
+  return 1;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -67,21 +100,11 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else if(r_scause() == 13||r_scause() == 15){
-    uint64 va = r_stval();
-    char* pa;
-    if(va < p->sz&&va > PGROUNDUP(p->trapframe->sp)&&(pa = kalloc())!=0){
-    // printf("page fault %p\n",va);
-    memset(pa, 0, PGSIZE);
-    va = PGROUNDDOWN(va);
-    if(mappages(p->pagetable, va, PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-      kfree(pa);
-      p->killed = 1;
-    }
-
-    }else{
-      p->killed = 1;
-    }
+  } else if((r_scause() == 13||r_scause() == 15) && is_lazy_addr(r_stval())){
+      uint64 va = r_stval();
+      if(lazy_alloc(va)<0){
+        p->killed = 1;
+      }
 
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
