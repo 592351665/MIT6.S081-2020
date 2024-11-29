@@ -9,7 +9,6 @@
 #include "riscv.h"
 #include "defs.h"
 
-int pg_refcnt[MX_PGIDX];
 
 void freerange(void *pa_start, void *pa_end);
 
@@ -25,20 +24,43 @@ struct {
   struct run *freelist;
 } kmem;
 
-struct spinlock refcnt_lock;
 
-void refcnt_inc(uint64 pa){
-  acquire(&refcnt_lock);
-  PG_REFCNT(pa)++;
-  release(&refcnt_lock);
-} 
+ struct {
+  struct spinlock lock;
+  int count[MX_PGIDX];
+ }refc;
+
+void
+refc_init(){
+  initlock(&refc.lock,"refc");
+  for(int i=0;i<MX_PGIDX;i++){
+    refc.count[i] = 0;
+  }
+}
+
+void refc_inc(uint64 pa){
+  acquire(&refc.lock);
+  refc.count[PG2REFIDX(pa)]++;
+  release(&refc.lock);
+}
+
+void refc_dec(uint64 pa){
+  acquire(&refc.lock);
+  refc.count[PG2REFIDX(pa)]--;
+  release(&refc.lock);
+}
 
 void
 kinit()
 {
+  refc_init();
   initlock(&kmem.lock, "kmem");
-  initlock(&refcnt_lock, "ref cnt");
   freerange(end, (void*)PHYSTOP);
+
+  char *p = (char*)PGROUNDUP((uint64)end);
+  for(;p+PGSIZE<=(char*)PHYSTOP;p+=PGSIZE){
+    refc_inc((uint64)p);
+  }
 }
 
 void
@@ -62,17 +84,17 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  acquire(&refcnt_lock);
-  if(--PG_REFCNT(pa)<=0){
-    memset(pa, 1, PGSIZE);
-    r = (struct run*)pa;
-    acquire(&kmem.lock);
-    r->next = kmem.freelist;
-    kmem.freelist = r;
-    release(&kmem.lock);
+  refc_dec((uint64)pa);
+  if(refc.count[PG2REFIDX(pa)] >0){
+    return;
   }
-  release(&refcnt_lock);
 
+  memset(pa, 1, PGSIZE);
+  r = (struct run*)pa;
+  acquire(&kmem.lock);
+  r->next = kmem.freelist;
+  kmem.freelist = r;
+  release(&kmem.lock);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -89,8 +111,9 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
-    PG_REFCNT(r) = 1;
+    refc_inc((uint64)r);
+  }
   return (void*)r;
 }
