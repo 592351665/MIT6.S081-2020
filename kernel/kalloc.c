@@ -25,42 +25,29 @@ struct {
 } kmem;
 
 
- struct {
+struct {
   struct spinlock lock;
-  int count[MX_PGIDX];
- }refc;
+  int count[PHYSTOP / PGSIZE];
+}refc;
 
+int
+refc_cnt(uint64 pa){
+  return refc.count[(uint64)pa / PGSIZE];
+}
 void
-refc_init(){
-  initlock(&refc.lock,"refc");
-  for(int i=0;i<MX_PGIDX;i++){
-    refc.count[i] = 0;
-  }
-}
-
-void refc_inc(uint64 pa){
+refc_inc(uint64 pa){
   acquire(&refc.lock);
-  refc.count[PG2REFIDX(pa)]++;
+  refc.count[(uint64)pa / PGSIZE]++;
   release(&refc.lock);
 }
 
-void refc_dec(uint64 pa){
-  acquire(&refc.lock);
-  refc.count[PG2REFIDX(pa)]--;
-  release(&refc.lock);
-}
 
 void
 kinit()
 {
-  refc_init();
   initlock(&kmem.lock, "kmem");
+  initlock(&refc.lock, "refc");
   freerange(end, (void*)PHYSTOP);
-
-  char *p = (char*)PGROUNDUP((uint64)end);
-  for(;p+PGSIZE<=(char*)PHYSTOP;p+=PGSIZE){
-    refc_inc((uint64)p);
-  }
 }
 
 void
@@ -68,8 +55,11 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE){
+    refc.count[(uint64)p / PGSIZE] = 1;
     kfree(p);
+  }
+
 }
 
 // Free the page of physical memory pointed at by v,
@@ -84,17 +74,19 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  refc_dec((uint64)pa);
-  if(refc.count[PG2REFIDX(pa)] >0){
-    return;
-  }
+  acquire(&refc.lock);
+  if(--refc.count[(uint64)pa / PGSIZE] == 0){
+    release(&refc.lock);
 
-  memset(pa, 1, PGSIZE);
-  r = (struct run*)pa;
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+    memset(pa, 1, PGSIZE);
+    r = (struct run*)pa;
+    acquire(&kmem.lock);
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    release(&kmem.lock);
+  }else{
+    release(&refc.lock);
+  }
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -107,13 +99,16 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r){
     kmem.freelist = r->next;
+    acquire(&refc.lock);
+    refc.count[(uint64)r / PGSIZE] = 1;
+    release(&refc.lock);
+  }
   release(&kmem.lock);
 
   if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
-    refc_inc((uint64)r);
   }
   return (void*)r;
 }

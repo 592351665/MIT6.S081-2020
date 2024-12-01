@@ -326,10 +326,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+      
     pa = PTE2PA(*pte);
 
-    *pte &= (~PTE_W);
-    *pte |= PTE_C;
+    if(*pte & PTE_W){
+      *pte = (*pte & ~PTE_W) | PTE_C;
+    }
     flags = PTE_FLAGS(*pte);
     // if((mem = kalloc()) == 0)
     //   goto err;
@@ -369,12 +371,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    if(uncopied_cow(pagetable,va0)){
-      if(cowalloc(pagetable,va0)<0){
-        return -1;
-      }
-    }
     pa0 = walkaddr(pagetable, va0);
+    if(uncopied_cow(pagetable,va0)==0){
+      pa0 = (uint64)cowalloc(pagetable,va0);
+    }
+    if(pa0 == 0){
+      return -1;
+    }
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
@@ -460,40 +463,50 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 int
 uncopied_cow(pagetable_t pagetable,uint64 va){
   if(va >= MAXVA){
-    return 0;
+    return -1;
   }
   pte_t* pte=walk(pagetable,va,0);
   if(pte == 0){
-    return 0;
+    return -1;
   }
   if((*pte & PTE_V)==0){
-    return 0;
+    return -1;
   }
-  if((*pte & PTE_U)==0){
-    return 0;
-  }
-  return (*pte & PTE_C);
+  return (*pte & PTE_C ? 0:-1);
 }
 
-int
+void*
 cowalloc(pagetable_t pagetable,uint64 va){
-  void* newpage;
+  if(va % PGSIZE!=0)
+    return 0;
+
+  uint64 pa = walkaddr(pagetable,va);
+  if(pa == 0)
+    return 0;
+
   pte_t* pte = walk(pagetable, va, 0);
-  uint flags = PTE_FLAGS(*pte);
-  uint64 prev_sta = PTE2PA(*pte);
 
-  flags &= PTE_W;
-  flags |= PTE_C;
+  if(refc_cnt(pa) == 1){
+    *pte = (*pte & ~PTE_C) | PTE_W;
+    return (void*)pa;
+  }else{
+    char* mem = kalloc();
+    if(mem == 0)
+      return 0;
+    memmove(mem,(char*)pa,PGSIZE);
 
-  if((newpage = kalloc()) == 0)
-    return -1;
-  memmove(newpage, (void*)prev_sta, PGSIZE);
-  va = PGROUNDDOWN(va);
-  uvmunmap(pagetable,va,1,1);
+    *pte &= ~PTE_V; //取消之前的映射
+    uint64 flags = PTE_FLAGS(*pte);
+    flags &= ~PTE_C;
+    flags |= PTE_W;
 
-  if(mappages(pagetable, va, PGSIZE, (uint64)newpage, flags) != 0){
-    kfree(newpage);
-    return -1;  
+    if(mappages(pagetable,va,PGSIZE,(uint64)mem,flags)!=0){
+      kfree(mem);
+      *pte |=PTE_V;
+      return 0;
+    }
+    kfree((char*)PGROUNDDOWN(pa));
+    return mem;
+
   }
-  return 0;
 }
