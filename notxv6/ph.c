@@ -16,7 +16,7 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
-pthread_mutex_t lock[NBUCKET] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t lock[NBUCKET];//静态初始化
 
 double
 now()
@@ -106,6 +106,10 @@ main(int argc, char *argv[])
   void *value;
   double t1, t0;
 
+  for(int i=0;i<NBUCKET;i++){
+    pthread_mutex_init(&lock[i],NULL);
+  }
+
   if (argc < 2) {
     fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
     exit(-1);
@@ -147,4 +151,8 @@ main(int argc, char *argv[])
 
   printf("%d gets, %.3f seconds, %.0f gets/second\n",
          NKEYS*nthread, t1 - t0, (NKEYS*nthread) / (t1 - t0));
+
+  for(int i=0;i<NBUCKET;i++){
+    pthread_mutex_destroy(&lock[i]);
+  }
 }
