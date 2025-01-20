@@ -22,6 +22,7 @@ struct {
   struct spinlock lock;
   struct run *freelist;
 } kmem[NCPU];
+//验证
 
 char lockname[8];
 
@@ -81,8 +82,8 @@ kalloc(void)
   struct run *r;
 
   push_off();//关中断
-  int cpu = cpuid();
 
+  int cpu = cpuid();
   acquire(&kmem[cpu].lock);
   r = kmem[cpu].freelist;
   if(r){
