@@ -22,7 +22,6 @@ struct {
   struct spinlock lock;
   struct run *freelist;
 } kmem[NCPU];
-//验证
 
 char lockname[8];
 
