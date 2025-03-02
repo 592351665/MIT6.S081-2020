@@ -122,30 +122,30 @@ sys_link(void)
   char name[DIRSIZ], new[MAXPATH], old[MAXPATH];
   struct inode *dp, *ip;
 
-  if(argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0)
+  if(argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0)//获取到两个字符串（源文件路径、目标路径）
     return -1;
 
   begin_op();
-  if((ip = namei(old)) == 0){
+  if((ip = namei(old)) == 0){ //根据源文件路径查找对应inode
     end_op();
     return -1;
   }
 
   ilock(ip);
-  if(ip->type == T_DIR){
+  if(ip->type == T_DIR){ //硬链接不能指向目录（除非是超级用户操作），以避免文件系统循环引用问题
     iunlockput(ip);
     end_op();
     return -1;
   }
 
-  ip->nlink++;
+  ip->nlink++;//硬链接计数记录了有多少个目录项引用该文件
   iupdate(ip);
   iunlock(ip);
 
-  if((dp = nameiparent(new, name)) == 0)
+  if((dp = nameiparent(new, name)) == 0)//查找目标路径的父目录 inode 和文件名
     goto bad;
   ilock(dp);
-  if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){
+  if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){ //在父目录中创建一个新的目录项，指向源文件的 inode 编号
     iunlockput(dp);
     goto bad;
   }
@@ -304,11 +304,30 @@ sys_open(void)
       return -1;
     }
   } else {
-    if((ip = namei(path)) == 0){
-      end_op();
-      return -1;
+    int symlink_depth = 0;
+    while(1){
+      if((ip = namei(path)) == 0){
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+      if(ip->type==T_SYMLINK && (omode & O_NOFOLLOW)==0){
+        if(++symlink_depth>10){
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        if(readi(ip,0,(uint64)path,0,MAXPATH)<0){
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        iunlockput(ip);
+      }else{ 
+        break;
+      }
     }
-    ilock(ip);
+
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
@@ -322,7 +341,7 @@ sys_open(void)
     return -1;
   }
 
-  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){ //分配新的文件结构体和文件描述符
     if(f)
       fileclose(f);
     iunlockput(ip);
@@ -484,3 +503,28 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_symlink(void){
+  struct inode *ip;
+  char target[MAXPATH],path[MAXPATH];//符号链接指向的目标路径、符号链接本身的路径
+
+  if(argstr(0,target,MAXPATH)<0||argstr(1,path,MAXPATH)<0){
+    return -1;
+  }
+  begin_op();
+  ip=create(path,T_SYMLINK,0,0);
+  if(ip==0){
+    end_op();
+    return -1;
+  }
+
+  if((writei(ip,0,(uint64)target,0,strlen(target)))<0){ //将目标路径 target 写入符号链接文件的第一个数据块
+    end_op();
+    return -1;
+  }
+  iunlockput(ip);
+
+  end_op();
+  return 0;
+} 
