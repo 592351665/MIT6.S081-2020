@@ -18,6 +18,16 @@ struct context {
   uint64 s11;
 };
 
+struct vma{
+  uint64 addr;
+  uint64 sz;
+  uint64 offset;
+  int prot;
+  int flags;
+  struct file *f;
+  int valid;
+};
+
 // Per-CPU state.
 struct cpu {
   struct proc *proc;          // The process running on this cpu, or null.
@@ -82,6 +92,7 @@ struct trapframe {
 
 enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -103,4 +114,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct vma vmas[NVMA];
 };

@@ -5,6 +5,9 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "fcntl.h"
+#include "proc.h"
+#include "file.h"
 
 /*
  * the kernel's page table.
@@ -427,5 +430,40 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
+  }
+}
+
+void
+vmaunmap(pagetable_t pagetable,uint64 va,uint64 nbytes,struct vma *v){
+  uint64 a;
+  pte_t *pte;
+
+  for(a=va;a<va+nbytes;a+=PGSIZE){
+    if((pte=walk(pagetable,a,0))==0){
+      continue;
+    }
+    if(PTE_FLAGS(*pte)==PTE_V){
+      panic("sys_munmap:not a leaf");//页表项的标志位仅为 PTE_V，说明该页表项不是叶子节点，不合法
+    }
+    //有效标志位，说明虚拟地址对应的物理页有效
+    if(*pte & PTE_V){
+      uint64 pa = PTE2PA(*pte);
+      if((*pte & PTE_D) && (v->flags & MAP_SHARED)){ //需要把物理页内容写回文件
+        begin_op();
+        ilock(v->f->ip);
+        uint64 aoff = a - v->addr;
+        if(aoff < 0){
+          writei(v->f->ip, 0, pa + (-aoff), v->offset, PGSIZE + aoff); //写回到文件v->offset的位置（映射部分的头）
+        }else if(aoff+PGSIZE > v->sz){
+          writei(v->f->ip,0,pa,v->offset+aoff,v->sz - aoff);
+        }else{
+          writei(v->f->ip,0,pa,v->offset+aoff,PGSIZE);
+        }
+        iunlock(v->f->ip);
+        end_op();
+      }
+      kfree((void*)pa);//写回后释放物理页
+      *pte = 0;
+    }
   }
 }

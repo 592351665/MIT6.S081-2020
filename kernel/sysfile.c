@@ -15,6 +15,8 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
+
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -481,6 +483,145 @@ sys_pipe(void)
     fileclose(rf);
     fileclose(wf);
     return -1;
+  }
+  return 0;
+}
+
+uint64
+sys_mmap(void){
+  uint64 addr,sz,offset;
+  int prot,flags,fd;
+  struct file *f;
+
+  //从寄存器中依次取出各个参数
+  if(argaddr(0,&addr)<0 || argaddr(1,&sz)<0 ||  argint(2,&prot)<0 || argint(3,&flags)<0 
+  || argfd(4,&fd,&f)<0 || argaddr(2,&offset)<0){
+    return -1;
+  }
+
+  //不可将不可写文件映射为MAP_SHARE
+  if((!f->readable && (prot & PROT_READ)) || (!f->writable && (prot & PROT_WRITE) && (flags & MAP_SHARED))){
+    return -1;
+  }
+  sz = PGROUNDUP(sz);
+
+  struct proc *p = myproc();
+  struct vma *v = 0;
+  uint64 vaend = MMAPEND;
+
+  for(int i=0;i<NVMA;i++){
+    struct vma *vv = &p->vmas[i];
+    if(vv->valid==0){
+      if(v->valid==0){
+        v = &p->vmas[i];
+        v->valid = 1;
+      }else if(vv->addr < vaend){
+        vaend =PGROUNDDOWN(vv->addr);
+      }
+    }
+  } 
+  if(v->valid == 0){
+    panic("mmap:no free vma");
+  } 
+  v->addr = vaend-sz;
+  v->sz = sz;
+  v->offset = offset;
+  v->flags = flags;
+  v->prot = prot;
+  v->f = f;
+
+  filedup(v->f);
+
+  return v->addr;
+}
+
+//查找包含虚拟地址va的vma
+struct vma *findvma(struct proc *p,uint64 va){
+  for(int i=0;i<NVMA;i++){
+    struct vma *vv = &p->vmas[i];
+    if(vv->valid == 1 && va>=vv->addr && va<vv->addr+vv->sz){
+      return vv;
+    }
+  }
+  return 0;
+}
+
+int
+vmatrylazytouch(uint64 va){
+  struct proc *p = myproc();
+  struct vma *v = findvma(p,va);
+  if(v==0){
+    return 0;
+  }
+
+  //分配物理页
+  void *pa = kalloc();
+  if(pa== 0){
+    panic("vmatrylazytouch:kalloc");
+  }
+  memset(pa,0,PGSIZE);
+
+  //从磁盘中读取文件数据
+  begin_op();
+  ilock(v->f->ip);
+  readi(v->f->ip,0,(uint64)pa,v->offset+PGROUNDDOWN(va - v->addr),PGSIZE);
+  iunlock(v->f->ip);
+  end_op();
+
+  int perm = PTE_U;//用户态权限，表示该页可被用户程序访问
+  if(v->prot & PROT_READ){
+    perm |= PTE_R;
+  }
+  if(v->prot & PROT_WRITE){
+    perm |= PTE_W;
+  }
+  if(v->prot & PROT_EXEC){
+    perm |= PTE_X;
+  }
+  if(mappages(p->pagetable,va,PGSIZE,(uint64)pa,perm)<0){
+    panic("vmatrylazytouch:mappages");
+  }
+
+  return 1;
+}
+
+uint64
+sys_munmap(void){
+  uint64 addr,sz;
+  if(argaddr(0,&addr)<0 || argaddr(1,&sz)<0){
+    return -1;
+  }
+
+  struct proc *p = myproc();
+  struct vma *v = findvma(p,addr);
+  if(v==0){
+    return -1;
+  }
+
+  if(addr>v->addr && addr+sz<v->addr+v->sz){ //防止空洞
+    return -1;
+  }
+
+  uint64 addr_aligned = addr;
+  if(addr_aligned>v->addr){
+    addr_aligned = PGROUNDUP(addr);//一半一半的页选择不释放
+  }
+  int nunmap = sz-(addr_aligned-addr);//要释放的字节数
+  if(nunmap<0){
+    nunmap = 0;
+  }
+
+  vmaunmap(p->pagetable, addr_aligned, nunmap, v);
+
+  if(addr<=v->addr && addr+sz >v->addr){
+    v->offset += addr+sz-v->addr;
+    v->addr = addr+sz;
+  }
+  v->sz -=sz;
+
+  if(v->sz<=0){
+    fileclose(v->f);
+    v->valid = 0;
   }
   return 0;
 }
