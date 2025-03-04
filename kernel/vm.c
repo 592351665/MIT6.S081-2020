@@ -6,8 +6,11 @@
 #include "defs.h"
 #include "fs.h"
 #include "fcntl.h"
+#include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "file.h"
+
 
 /*
  * the kernel's page table.

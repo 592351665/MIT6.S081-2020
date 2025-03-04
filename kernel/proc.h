@@ -19,15 +19,7 @@ struct context {
   uint64 s11;
 };
 
-struct vma{
-  uint64 addr;
-  uint64 sz;
-  uint64 offset;
-  int prot;
-  int flags;
-  struct file *f;
-  int valid;
-};
+
 
 // Per-CPU state.
 struct cpu {
@@ -92,6 +84,18 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+
+struct vma{
+  uint64 addr;
+  uint64 sz;
+  uint64 offset;
+  int prot;
+  int flags;
+  struct file *f;
+  int valid;
+};
+
+#define NVMA         16
 
 // Per-process state
 struct proc {
