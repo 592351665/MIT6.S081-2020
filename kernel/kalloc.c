@@ -23,14 +23,22 @@ struct {
   struct run *freelist;
 } kmem[NCPU];
 
-char lockname[8];
+char *kmem_lock_names[] = {
+  "kmem_cpu_0",
+  "kmem_cpu_1",
+  "kmem_cpu_2",
+  "kmem_cpu_3",
+  "kmem_cpu_4",
+  "kmem_cpu_5",
+  "kmem_cpu_6",
+  "kmem_cpu_7",
+};
 
 void
 kinit()
 {
   for(int i=0;i<NCPU;i++){
-    snprintf(lockname,8,"kmem_%d",i);
-    initlock(&kmem[i].lock, lockname);
+    initlock(&kmem[i].lock, kmem_lock_names[i]);
   }
   freerange(end, (void*)PHYSTOP);
 }
