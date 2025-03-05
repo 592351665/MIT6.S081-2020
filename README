@@ -1,4 +1,3 @@
-![image text](https://blog.miigon.net/assets/img/mit6s081-lab10-useraddrspace.png)
 mmap（memory map）允许将一个文件或设备中的一部分内容映射到进程的虚拟地址空间，当文件映射成功后，进程可以直接通过指针访问文件内容，而无需再调用系统的 I/O 函数，这种方式提高了文件访问的效率。
 
 1.xv6的虚拟地址空间与linux不同，堆在栈的上面，且堆向上增长；我们选择将 mmap 映射进来的文件 map 到尽可能高的位置，也就是刚好在 trapframe 下面。并且若有多个 mmap 的文件，则向下生长。
