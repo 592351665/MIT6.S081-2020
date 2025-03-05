@@ -495,7 +495,7 @@ sys_mmap(void){
 
   //从寄存器中依次取出各个参数
   if(argaddr(0,&addr)<0 || argaddr(1,&sz)<0 ||  argint(2,&prot)<0 || argint(3,&flags)<0 
-  || argfd(4,&fd,&f)<0 || argaddr(2,&offset)<0){
+  || argfd(4,&fd,&f)<0 || argaddr(5,&offset)<0){
     return -1;
   }
 
@@ -512,12 +512,12 @@ sys_mmap(void){
   for(int i=0;i<NVMA;i++){
     struct vma *vv = &p->vmas[i];
     if(vv->valid==0){
-      if(v->valid==0){
+      if(v==0){
         v = &p->vmas[i];
         v->valid = 1;
-      }else if(vv->addr < vaend){
-        vaend =PGROUNDDOWN(vv->addr);
       }
+    }else if(vv->addr < vaend){
+        vaend =PGROUNDDOWN(vv->addr);
     }
   } 
   if(v->valid == 0){
@@ -539,7 +539,10 @@ sys_mmap(void){
 struct vma *findvma(struct proc *p,uint64 va){
   for(int i=0;i<NVMA;i++){
     struct vma *vv = &p->vmas[i];
-    if(vv->valid == 1 && va>=vv->addr && va<vv->addr+vv->sz){
+    // if (vv->addr + vv->sz < vv->addr) {
+    //   panic("unsigned overflow detected");
+    // }
+    if(vv->valid == 1 && va>=vv->addr && va  < vv->addr +  vv->sz){
       return vv;
     }
   }
