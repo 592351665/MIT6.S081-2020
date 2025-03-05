@@ -44,6 +44,7 @@ int nummap = sz-(addr_aligned-addr)：释放起始地址向上对齐，确保被
 vmaunmap解除部分映射后，要修改vma的offset,sz,addr等：如果是头部unmap，在文件中对应偏移改变，v->addr变高；
 
 
+
 7.函数vmaunmap：
 
 作用：解除vma对应部分的映射，并释放相关的物理内存。如果映射的内容被修改过（即“脏页”），并且是共享映射（`MAP_SHARED`），还需要将数据（物理内存）写回到磁盘文件中
@@ -62,3 +63,17 @@ In file included from kernel/vm.c:9: kernel/proc.h:98:19: error: field 'lock' ha
 实现解除映射、释放物理内存并对脏页进行写回这部分功能，用到walk函数，该函数在vm.c中，同时为了增强复用性；
 
 因为用到了vma和file结构体，所以应包含对应头文件；运行就会报上面错误，再尝试加入自旋锁和睡眠锁的头文件，因为加在了后面，所以依旧报错，要加载前面，注意头文件的依赖关系；
+
+流程：
+
+mmap部分：
+
+r_scause() == 8 系统调用异常，
+
+usertrap-syscall-sys_mmap，找到一个vma与文件进行映射，但此时没有实际内容；
+
+当访问vma时会发生缺页中断，调用vmatrylazytouch函数，查找va所在的vma，找到对应的文件，从读取磁盘文件内容到物理内存页，将虚拟地址映射到物理页；
+
+munmap部分：
+
+usertrap-syscall-sys_munmap，取消vma文件映射，调用函数vmaunmap 将脏页写回文件，释放物理页；
