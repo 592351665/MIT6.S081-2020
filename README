@@ -1,45 +1,43 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+## 1.Memory allocator
 
-ACKNOWLEDGMENTS
+思路：原本是多个cpu共用一个空闲链表，只有一个锁，kfree或kalloc对锁的竞争严重；
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+现在将大锁换小锁，降低锁的粒度；每个cpu有一个自己的空闲链表和对应锁，操作自己的链表，只有在自己空闲链表为空时，才会访问别的链表；
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+1.kalloc：
 
-We are also grateful for the bug reports and patches contributed by
-Silas Boyd-Wickizer, Anton Burtsev, Dan Cross, Cody Cutler, Mike CAT,
-Tej Chajed, Asami Doi, eyalz800, , Nelson Elhage, Saar Ettinger, Alice
-Ferrazzi, Nathaniel Filardo, Peter Froehlich, Yakir Goaron,Shivam
-Handa, Bryan Henry, jaichenhengjie, Jim Huang, Alexander Kapshuk,
-Anders Kaseorg, kehao95, Wolfgang Keller, Jonathan Kimmitt, Eddie
-Kohler, Austin Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay,
-Hitoshi Mitake, Carmi Merimovich, Mark Morrissey, mtasm, Joel Nider,
-Greg Price, Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya
-Shigemitsu, Takahiro, Cam Tenny, tyfkda, Rafael Ubal, Warren Toomey,
-Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang
-Wei.
+当自己空闲链表为空时，遍历其余核的空闲链表，找到了就从链表头部偷一块并返回；
 
-The code in the files that constitute xv6 is
-Copyright 2006-2020 Frans Kaashoek, Robert Morris, and Russ Cox.
+## 2.buffer cache
 
-ERROR REPORTS
+miigon
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu). The main purpose of xv6 is as a teaching
-operating system for MIT's 6.S081, so we are more interested in
-simplifications and clarifications than new features.
+思路：原本是使用双向链表存储所有区块缓存，根据blockno查找区块时遍历链表，找到直接返回；未找到则选一个最近最久未使用且引用计数为0的区块返回。
 
-BUILDING AND RUNNING XV6
+现在 建立一个从blockno到区块的哈希表，为每个哈希桶单独加锁；只有不同进程要访问的区块哈希到同一个桶中时才会发生锁竞争；当桶中的空闲buf区块不足时，从其他桶中获取。
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu. Once they are installed, and in your shell
-search path, you can run "make qemu".
+1.根据描述可知，我们在持有key桶锁的情况下去遍历获取其他桶锁，会出现环路死锁；进程1持有锁2尝试获取锁5，进程2持有锁5尝试获取锁2；
+
+死锁的四个条件：互斥、持有请求、不可剥夺、环路等待；
+
+分析后发现只有“持有请求”可以破坏，再尝试获取其他桶锁前，释放key桶锁；
+
+2.导致新问题，在“释放了key桶锁”到“再次获取key桶锁”之间执行了缓存驱逐，同时也有可能另外一个cpu要访问相同的blockno，获取key桶锁，通过了“缓存不存在”测试，也进入到缓存驱逐过程，导致同一个区块有多个缓存的错误情况；
+
+采用的解决方法是，添加驱逐锁，将缓存驱逐+再分配的过程限制为单线程，牺牲了一点效率，保证了极端情况下的安全；获取驱逐锁后，再进行一次“缓存不存在”测试；
+
+代码细节：
+
+1.bget中为何遍历哈希桶中的缓冲区要用到b->next？before_least->next?
+
+1）bcache.bufmap[i]为哈希桶链表的头节点，不存储实际的缓冲区数据，只是一个哨兵节点；bcache.bufmap[i].next才是桶中链表实际的头节点；
+
+2）before_least是所求要淘汰的缓冲区的上一个，为了方便单向链表删除操作；
+
+2.两个锁的功能
+
+1）bufmap_locks保护单个桶的链表结构，以及桶内所有节点的refcnt;
+
+2）eviction_lock保护所有桶的链表结构，每个桶链表内的节点数量不会增加、减少、顺序改变，因为不会有别的进程进行驱逐操作；但不保护链表中节点的refcnt，所以要再获取对应桶锁；
+
+3.乐观锁optimistic locking：允许竟态条件的发生，会进行检测；
