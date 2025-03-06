@@ -1,45 +1,33 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+## Uthread
 
-ACKNOWLEDGMENTS
+目的：实现用户态下线程切换（协程）
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+流程：
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+1）旧进程的用户线程陷入内核态，将用户程序的寄存器保存在trapframe中，进入内核态；
 
-We are also grateful for the bug reports and patches contributed by
-Silas Boyd-Wickizer, Anton Burtsev, Dan Cross, Cody Cutler, Mike CAT,
-Tej Chajed, Asami Doi, eyalz800, , Nelson Elhage, Saar Ettinger, Alice
-Ferrazzi, Nathaniel Filardo, Peter Froehlich, Yakir Goaron,Shivam
-Handa, Bryan Henry, jaichenhengjie, Jim Huang, Alexander Kapshuk,
-Anders Kaseorg, kehao95, Wolfgang Keller, Jonathan Kimmitt, Eddie
-Kohler, Austin Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay,
-Hitoshi Mitake, Carmi Merimovich, Mark Morrissey, mtasm, Joel Nider,
-Greg Price, Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya
-Shigemitsu, Takahiro, Cam Tenny, tyfkda, Rafael Ubal, Warren Toomey,
-Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang
-Wei.
+2）调用thread_yield()让出cpu，调用thread_schedule()进行线程切换；
 
-The code in the files that constitute xv6 is
-Copyright 2006-2020 Frans Kaashoek, Robert Morris, and Russ Cox.
+3）实际切换就一行：thread_switch((uint64)&t->context,(uint64)&next_thread->context)
 
-ERROR REPORTS
+将旧线程的 被调用者保存寄存器（callee-saved registers） 保存到t->context中，新线程的上下文next_thread->context加载到寄存器中，返回寄存器ra；调用者保存寄存器（caller-saved registers）在调用switch函数前会隐式地自动保存到线程栈中；
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu). The main purpose of xv6 is as a teaching
-operating system for MIT's 6.S081, so we are more interested in
-simplifications and clarifications than new features.
+4）usertrapret()，返回用户空间；
 
-BUILDING AND RUNNING XV6
+##  Using threads
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu. Once they are installed, and in your shell
-search path, you can run "make qemu".
+1.pthread_mutex_t lock[NBUCKET] = {PTHREAD_MUTEX_INITIALIZER};
+
+为每个BUCKET定义一个互斥锁，并通过宏进行静态初始化，互斥锁初始化为未锁定状态；
+
+2.互斥锁动态初始化，结束前要销毁锁
+
+for (int i = 0; i < NBUCKET; ++i)    pthread_mutex_init(&lock[i], NULL);
+
+for (int i = 0; i < NBUCKET; ++i)    pthread_mutex_destroy(&lock[i]);
+
+3.降低锁的粒度，不是每个哈希表一个锁，而是每个bucket一个锁；
+
+4.get不修改，put会调用insert修改，在insert前后加上锁；
+
+##  Barrier
