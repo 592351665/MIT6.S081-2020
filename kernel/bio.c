@@ -24,7 +24,7 @@
 #include "buf.h"
 
 #define NBUFMAP_BUCKET 13
-#define HASH(dev,blockno) ((((dev)<<27)|(blockno))%NBUFMAP_BUCKET)
+#define HASH(dev,blockno) ((((dev)<<27)|(blockno))%NBUFMAP_BUCKET) //哈希函数：将blockno映射到哈希表的某个桶中
 
 struct {
   struct spinlock eviction_lock;
@@ -79,8 +79,8 @@ bget(uint dev, uint blockno)
   acquire(&bcache.eviction_lock);//驱逐锁
 
   //获取淘汰锁后再次进行遍历查询，确保不会为同一区块创建多个缓存
-  //该线程持有淘汰锁，不会再发生别的淘汰操作，所有哈希桶的链表结构不会改变；
-  //因此无需持有对应桶的锁就可以进行 遍历 ，因为有了更强淘汰锁
+  //该线程持有驱逐锁，不会再发生别的驱逐操作，所有哈希桶的链表结构不会改变；
+  //因此无需持有对应桶的锁就可以进行 遍历 ，因为有了更强的驱逐锁
   for(b=bcache.bufmap[key].next;b;b=b->next){
     if(b->dev==dev&&b->blockno==blockno){
       acquire(&bcache.bufmap_locks[key]);//此处需要获取桶锁，是为了确保refcnt++这个非原子操作
@@ -115,6 +115,7 @@ bget(uint dev, uint blockno)
     panic("bget:no buffers");
   }
   b=before_least->next;
+  //依旧持有holding_bucket桶锁
 
   //缓冲区的重新分配
   if(holding_bucket!=key){
