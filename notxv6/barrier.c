@@ -26,10 +26,7 @@ static void
 barrier()
 {
   // YOUR CODE HERE
-  //
-  // Block until all threads have called barrier() and
-  // then increment bstate.round.
-  //
+
   pthread_mutex_lock(&bstate.barrier_mutex);
   bstate.nthread++;
   if(bstate.nthread<nthread){

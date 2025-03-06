@@ -16,6 +16,7 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
+
 pthread_mutex_t lock[NBUCKET];//静态初始化
 
 double

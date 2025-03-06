@@ -96,8 +96,8 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
-  t->context.ra = (uint64)func;
-  t->context.sp = (uint64)t->stack + STACK_SIZE;
+  t->context.ra = (uint64)func;//当线程被调度时，控制流会从 ra 指定的地址开始执行
+  t->context.sp = (uint64)t->stack + STACK_SIZE;//t->stack 是线程 栈的起始地址,加上栈大小，计算出栈顶地址
 }
 
 void 
