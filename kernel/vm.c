@@ -329,14 +329,14 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       
     pa = PTE2PA(*pte);
 
-    if(*pte & PTE_W){
-      *pte = (*pte & ~PTE_W) | PTE_C;
-    }
+    *pte &= (~PTE_W) ;
+    *pte |= PTE_C;
     flags = PTE_FLAGS(*pte);
     // if((mem = kalloc()) == 0)
     //   goto err;
     // memmove(mem, (char*)pa, PGSIZE);
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      printf("uvmcopy failed\n");
       goto err;
     }
     refc_inc(pa);
@@ -371,10 +371,11 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
     if(uncopied_cow(pagetable,va0)==0){
       pa0 = (uint64)cowalloc(pagetable,va0);
     }
+    pa0 = walkaddr(pagetable, va0);
+
     if(pa0 == 0){
       return -1;
     }
@@ -475,38 +476,29 @@ uncopied_cow(pagetable_t pagetable,uint64 va){
   return (*pte & PTE_C ? 0:-1);
 }
 
-void*
-cowalloc(pagetable_t pagetable,uint64 va){
-  if(va % PGSIZE!=0)
-    return 0;
-
-  uint64 pa = walkaddr(pagetable,va);
-  if(pa == 0)
-    return 0;
-
+int cowalloc(pagetable_t pagetable, uint64 va){
   pte_t* pte = walk(pagetable, va, 0);
+  if(pte == 0) return -1;
 
-  if(refc_cnt(pa) == 1){
-    *pte = (*pte & ~PTE_C) | PTE_W;
-    return (void*)pa;
-  }else{
-    char* mem = kalloc();
-    if(mem == 0)
-      return 0;
-    memmove(mem,(char*)pa,PGSIZE);
+  uint64 perm = PTE_FLAGS(*pte);
+  
+  uint64 prev_sta = PTE2PA(*pte); //父子共享的物理页
 
-    *pte &= ~PTE_V; //取消之前的映射
-    uint64 flags = PTE_FLAGS(*pte);
-    flags &= ~PTE_C;
-    flags |= PTE_W;
-
-    if(mappages(pagetable,va,PGSIZE,(uint64)mem,flags)!=0){
-      kfree(mem);
-      *pte |=PTE_V;
-      return 0;
-    }
-    kfree((char*)PGROUNDDOWN(pa));
-    return mem;
-
+  void *newpage = kalloc();     
+  if(!newpage){
+    return -1;
   }
+  uint64 page_va = PGROUNDDOWN(va); 
+
+  perm &= (~PTE_C); // 取消cow标志位
+  perm |= PTE_W;    // 复制之后就可以写了
+
+  memmove(newpage, (void*)prev_sta, PGSIZE); // 把父进程页帧的数据复制一遍
+  uvmunmap(pagetable, page_va, 1, 1);      // 然后取消对父进程页帧的映射
+  
+  if(mappages(pagetable, page_va, PGSIZE, (uint64)newpage, perm) < 0){
+    kfree(newpage);
+    return -1;
+  }
+  return 0;
 }
