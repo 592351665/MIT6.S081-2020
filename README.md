@@ -7,19 +7,21 @@ MIT6.S081：Operating System Engineering：[中文手册](https://mit-public-cou
 
 - [X] [syscall](https://github.com/592351665/MIT6.S081-2020/tree/syscall)
 
-[pgtble](https://github.com/592351665/MIT6.S081-2020/tree/pgtbl)
+- [X] [pgtble](https://github.com/592351665/MIT6.S081-2020/tree/pgtbl)
 
-[traps](https://github.com/592351665/MIT6.S081-2020/tree/traps)
+- [X] [traps](https://github.com/592351665/MIT6.S081-2020/tree/traps)
 
-[lazy](https://github.com/592351665/MIT6.S081-2020/tree/lazy)
+- [X] [lazy](https://github.com/592351665/MIT6.S081-2020/tree/lazy)
 
-[cow](https://github.com/592351665/MIT6.S081-2020/tree/cow)
+- [X] [cow](https://github.com/592351665/MIT6.S081-2020/tree/cow)
 
-[thread](https://github.com/592351665/MIT6.S081-2020/tree/thread)
+- [X] [thread](https://github.com/592351665/MIT6.S081-2020/tree/thread)
 
-[lock](https://github.com/592351665/MIT6.S081-2020/tree/lock)
+- [X] [lock](https://github.com/592351665/MIT6.S081-2020/tree/lock)
 
-[fs](https://github.com/592351665/MIT6.S081-2020/tree/fs)
+- [X] [fs](https://github.com/592351665/MIT6.S081-2020/tree/fs)
 
-[mmap](https://github.com/592351665/MIT6.S081-2020/tree/mmap)
+- [X] [mmap](https://github.com/592351665/MIT6.S081-2020/tree/mmap)
+
+- [ ] [network]
 
