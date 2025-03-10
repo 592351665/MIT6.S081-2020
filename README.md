@@ -1,4 +1,3 @@
-mit 6.S081-lab
 
 MIT6.S081：Operating System Engineering：[中文手册](https://mit-public-courses-cn-translatio.gitbook.io/mit6-s081)
 
@@ -6,7 +5,7 @@ MIT6.S081：Operating System Engineering：[中文手册](https://mit-public-cou
 
 各实验分支如下：
 
-[syscall](https://github.com/592351665/MIT6.S081-2020/tree/syscall)
+- [X] [syscall](https://github.com/592351665/MIT6.S081-2020/tree/syscall)
 
 [pgtble](https://github.com/592351665/MIT6.S081-2020/tree/pgtbl)
 
