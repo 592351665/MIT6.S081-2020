@@ -1,45 +1,73 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+1.单级页表：
 
-ACKNOWLEDGMENTS
+64位地址中的低39位表示虚拟地址（27+12），27（9+9+9）位对应PTE编号，12位为偏移；页表基地址+PTE编号 可找到对应PTE（大小为4B），PTE由物理块号PPN（44位）+flags组成；得到的PPN+虚拟地址中的offset得最终物理地址；
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+2.多级页表：
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+多级页表优势？节省页表本身占用内存大小
 
-We are also grateful for the bug reports and patches contributed by
-Silas Boyd-Wickizer, Anton Burtsev, Dan Cross, Cody Cutler, Mike CAT,
-Tej Chajed, Asami Doi, eyalz800, , Nelson Elhage, Saar Ettinger, Alice
-Ferrazzi, Nathaniel Filardo, Peter Froehlich, Yakir Goaron,Shivam
-Handa, Bryan Henry, jaichenhengjie, Jim Huang, Alexander Kapshuk,
-Anders Kaseorg, kehao95, Wolfgang Keller, Jonathan Kimmitt, Eddie
-Kohler, Austin Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay,
-Hitoshi Mitake, Carmi Merimovich, Mark Morrissey, mtasm, Joel Nider,
-Greg Price, Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya
-Shigemitsu, Takahiro, Cam Tenny, tyfkda, Rafael Ubal, Warren Toomey,
-Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang
-Wei.
+与单级页表不同的是，取到的物理块号是作为下一级页表的基地址；
 
-The code in the files that constitute xv6 is
-Copyright 2006-2020 Frans Kaashoek, Robert Morris, and Russ Cox.
+## Print a page table
 
-ERROR REPORTS
+pgtblprint（）：
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu). The main purpose of xv6 is as a teaching
-operating system for MIT's 6.S081, so we are more interested in
-simplifications and clarifications than new features.
+1)第二个参数为递归深度，用来控制递归次数，选择对应的几级页表；
 
-BUILDING AND RUNNING XV6
+2）参考freewalk函数中的实现，if(pte & PTE_V) 判断是否为有效PTE，无效PTE不打印；
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu. Once they are installed, and in your shell
-search path, you can run "make qemu".
+3）通过switch根据depth选择对应要打印的.....；然后再打印PTE，索引、pte bits、物理地址，后两个用%p占位打印；
+
+4）if((pte & (PTE_R|PTE_W|PTE_X))==0)，判断是否为最后一级页表，只有最后一级的PTE才对应最终物理地址，一定满足读写可执行之一的条件，而第二、第三级的PTE对应的只是下一级页表的索引地址，不需要读写或可执行。递归调用pgtblprint时注意把得到的物理地址child转为所需的pagetable_t类型，depth+1；
+
+
+
+***当内核需要使用在系统调用中传递过来的用户指针时，因为已经切换到了全局共享的内核页表，导致指针地址无效，必须首先将指针转换成物理地址，后两题的目标是：允许内核直接解引用用户指针***
+
+## A kernel page table per process
+
+**1.为每个进程创建其独立的内核页表**
+
+**2.内核栈：**
+
+原本所有内核进程共用一个内核页表，在内核页表的较高位置分配各个进程的内核栈kstack，映射到不同物理地址，且两个不同 kstack 中间隔着一个无映射的 guard page 用于检测栈溢出错误；
+
+现在每个进程都有一个自己的内核页表，只需要访问自己的内核栈即可，将所有进程的内核栈映射到各自内核页表固定位置即可（不同页表内的同一逻辑地址，指向不同物理内存）；
+
+**3.进程结束后，释放内核页表和内核栈，回收资源，防止内存泄露**
+
+1）先释放内核栈，再释放内核页表，若先释放了整个页表的映射，就找不到内核栈的物理内存
+
+2）内核页表本身是每个进程独有的，但其映射的物理内存其实是整个内核的物理内存，是全局的，所以**不能释放物理内存**，只能释放页表；
+
+仿照freewalk函数，除了叶子物理内存页，别的页面上的有效页表项清空为0；
+
+kfree((void*)pagetable)  释放当前级别页表所占用空间；
+
+
+
+无法识别myproc()，添加头文件：\#include "spinlock.h"  \#include "proc.h"
+
+## Simplify
+
+目的：在内核页表中维护一个用户页表映射副本，这样内核可以对用户态传来的指针（逻辑地址）进行解引用。
+
+优点：原来copyin函数通过模拟访问页表过程获取物理地址，当内核页表中维护了用户页表映射副本后，可以利用CPU硬件寻址功能找到物理地址，效率更高；
+
+1.将用户页表映射关系拷贝到内核页表的函数kvmcopymappings()：
+
+1）只拷贝映射关系，不拷贝物理内存，用户页表和内核页表都指向同一块物理内存；
+
+2）用**PGROUNDUP**(start)将起始地址变为PGSIZE的整数倍，否则会报错page not present
+
+3）清除PTE中的PTE_U标志
+
+2.在每一处修改了用户页表的位置，要以相同的方式修改内核页表中所加入的部分
+
+1）**fork():**创建子进程，复制了父进程的用户页表后，调用kvmcopymappings()函数再将子进程的用户页表复制到内核页表中；
+
+2）**exec()：**在原进程基础上替换成新的进程（本质还是同一个进程，但PCB信息全都替换），内核页表也需要随之调整，清除旧映射，添加新映射；
+
+3）**sbrk()：**增加或收缩 进程的用户地址空间，调用growproc（）；
+
+4）**userinit()：**位于proc.c中，用于初始化 xv6 启动时第一个用户进程, 该进程的加载是独立的, 因此也需要将其用户页表拷贝到内核页表；
