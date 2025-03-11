@@ -1,3 +1,4 @@
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/15e02f3ea5ff43f6b5f471974b42e33e.png#pic_center)
 ## 1.Large files
 
 目的：通过混合索引机制添加二级索引页表，增大文件大小
