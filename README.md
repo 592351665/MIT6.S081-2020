@@ -1,4 +1,3 @@
-![1474613dbf363bbe5e0a6592fae22d8](E:\文档\微信\WeChat Files\wxid_k2hd9dmls5ms22\FileStorage\Temp\1474613dbf363bbe5e0a6592fae22d8.png)
 ## 1.Large files
 
 目的：通过混合索引机制添加二级索引页表，增大文件大小
