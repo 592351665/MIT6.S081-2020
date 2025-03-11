@@ -1,3 +1,4 @@
+![User Address Space](https://blog.miigon.net/assets/img/mit6s081-lab10-useraddrspace.png)
 1.在调用sbrk()增大堆空间时，不给其实际分配物理内存，当访问到这段地址发生缺页中断时，再进行分配物理内存、进行映射；
 
 sys_sbrk()系统调用：通过内核增大用户空间堆的大小；p->sz 指向堆顶，xv6中，堆从低地址向高地址增长；
